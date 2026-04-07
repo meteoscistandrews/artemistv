@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Artemis Trajectory Display</title>
+<title>Artemis Mission Control</title>
 
 <style>
 body {
@@ -19,12 +19,11 @@ body {
   height: 100vh;
 }
 
-/* SPACE */
 .space {
   position: relative;
 }
 
-/* Stars */
+/* Stars (parallax layers) */
 .star {
   position: absolute;
   background: white;
@@ -42,7 +41,13 @@ body {
   transform: translateY(-50%);
   background: url("https://upload.wikimedia.org/wikipedia/commons/9/97/The_Earth_seen_from_Apollo_17.jpg");
   background-size: cover;
+  animation: rotateEarth 25s linear infinite;
   box-shadow: 0 0 40px rgba(0,150,255,0.9);
+}
+
+@keyframes rotateEarth {
+  from { background-position: 0 0; }
+  to { background-position: 200% 0; }
 }
 
 /* Moon */
@@ -58,6 +63,17 @@ body {
   box-shadow: 0 0 25px white;
 }
 
+/* Ship */
+.ship {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: red;
+  border-radius: 50%;
+  box-shadow: 0 0 20px red;
+  transform-origin: center;
+}
+
 /* SVG */
 svg {
   position: absolute;
@@ -65,15 +81,11 @@ svg {
   height: 100%;
 }
 
-/* Ship */
-.ship {
+/* Labels */
+.label {
   position: absolute;
-  width: 14px;
-  height: 14px;
-  background: red;
-  border-radius: 50%;
-  box-shadow: 0 0 20px red;
-  transform: translate(-50%, -50%);
+  font-size: 12px;
+  color: #ccc;
 }
 
 /* Panel */
@@ -82,7 +94,7 @@ svg {
   padding: 20px;
   display: flex;
   flex-direction: column;
-  justify-content: space-around;
+  justify-content: space-between;
 }
 
 h1 {
@@ -90,12 +102,18 @@ h1 {
 }
 
 .data {
-  font-size: 1.2em;
+  font-size: 1.1em;
 }
 
-.label {
+.sub {
   color: #aaa;
   font-size: 0.8em;
+}
+
+/* Graph */
+canvas {
+  background: #111;
+  border-radius: 10px;
 }
 </style>
 </head>
@@ -106,14 +124,15 @@ h1 {
 
   <div class="space" id="space"></div>
 
-  <!-- PANEL -->
   <div class="panel">
     <h1>🚀 ARTEMIS II</h1>
 
-    <div class="data"><div class="label">Velocity</div><div id="speed"></div></div>
-    <div class="data"><div class="label">Distance to Moon</div><div id="distance"></div></div>
-    <div class="data"><div class="label">Mission Time</div><div id="time"></div></div>
-    <div class="data"><div class="label">Phase</div><div id="phase"></div></div>
+    <div class="data"><div class="sub">Velocity</div><div id="speed"></div></div>
+    <div class="data"><div class="sub">Distance</div><div id="distance"></div></div>
+    <div class="data"><div class="sub">Mission Time</div><div id="time"></div></div>
+    <div class="data"><div class="sub">Phase</div><div id="phase"></div></div>
+
+    <canvas id="graph" width="300" height="150"></canvas>
   </div>
 
 </div>
@@ -121,8 +140,8 @@ h1 {
 <script>
 const space = document.getElementById("space");
 
-/* ⭐ STAR FIELD */
-for(let i=0;i<200;i++){
+/* Stars */
+for(let i=0;i<250;i++){
   let s=document.createElement("div");
   s.className="star";
   let size=Math.random()*2+1;
@@ -134,28 +153,18 @@ for(let i=0;i<200;i++){
   space.appendChild(s);
 }
 
-/* 🌍 Earth */
-let earth=document.createElement("div");
-earth.className="earth";
-space.appendChild(earth);
+/* Earth & Moon */
+space.innerHTML += `<div class="earth"></div><div class="moon"></div>`;
 
-/* 🌙 Moon */
-let moon=document.createElement("div");
-moon.className="moon";
-space.appendChild(moon);
-
-/* 🛰️ SVG PATH */
+/* SVG */
 space.innerHTML += `
 <svg viewBox="0 0 1000 500">
-
-  <!-- Full path -->
   <path id="orbit"
     d="M 100 300 Q 500 50 900 250"
     stroke="rgba(255,255,255,0.2)"
     stroke-width="2"
     fill="none"/>
 
-  <!-- Traveled path -->
   <path id="progress"
     d="M 100 300 Q 500 50 900 250"
     stroke="rgba(255,60,60,0.95)"
@@ -167,7 +176,22 @@ space.innerHTML += `
 </svg>
 `;
 
-/* 🚀 Ship */
+/* Labels */
+function addLabel(text, x, y){
+  let l=document.createElement("div");
+  l.className="label";
+  l.innerText=text;
+  l.style.left=x+"%";
+  l.style.top=y+"%";
+  space.appendChild(l);
+}
+
+addLabel("LEO",15,60);
+addLabel("TLI",40,30);
+addLabel("MIDCOURSE",60,40);
+addLabel("FLYBY",85,45);
+
+/* Ship */
 let ship=document.createElement("div");
 ship.className="ship";
 space.appendChild(ship);
@@ -177,6 +201,26 @@ const progressPath = document.getElementById("progress");
 
 let t = 0;
 let time = 0;
+let history = [];
+
+/* Graph */
+const canvas = document.getElementById("graph");
+const ctx = canvas.getContext("2d");
+
+function drawGraph(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.beginPath();
+
+  history.forEach((v,i)=>{
+    let x=i*(canvas.width/100);
+    let y=canvas.height-(v/35000)*canvas.height;
+    if(i===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+  });
+
+  ctx.strokeStyle="lime";
+  ctx.stroke();
+}
 
 function formatTime(t){
   let h=Math.floor(t/3600);
@@ -186,38 +230,44 @@ function formatTime(t){
 }
 
 function update(){
-  t += 0.0015;
+  t+=0.0015;
   time++;
 
   if(t>1) t=0;
 
-  let totalLength = path.getTotalLength();
-  let currentLength = t * totalLength;
+  let total=path.getTotalLength();
+  let current=t*total;
 
-  /* 🚀 Ship position */
-  let point = path.getPointAtLength(currentLength);
-  ship.style.left = point.x + "px";
-  ship.style.top = point.y + "px";
+  let p1=path.getPointAtLength(current);
+  let p2=path.getPointAtLength(current+1);
 
-  /* 🔴 Traveled path */
-  progressPath.style.strokeDasharray = currentLength + " " + totalLength;
+  /* Position */
+  ship.style.left=p1.x+"px";
+  ship.style.top=p1.y+"px";
 
-  /* 📊 Telemetry */
-  let velocity = 28000 + 5000*Math.cos(Math.PI*t);
-  let distance = 384400*(1-t);
+  /* Rotation */
+  let angle=Math.atan2(p2.y-p1.y,p2.x-p1.x)*180/Math.PI;
+  ship.style.transform=`translate(-50%,-50%) rotate(${angle}deg)`;
 
-  document.getElementById("speed").innerText =
-    Math.round(velocity).toLocaleString()+" km/h";
+  /* Path progress */
+  progressPath.style.strokeDasharray=current+" "+total;
 
-  document.getElementById("distance").innerText =
-    Math.round(distance).toLocaleString()+" km";
+  /* Physics-inspired */
+  let velocity=28000+6000*Math.cos(Math.PI*t);
+  let distance=384400*(1-t);
 
-  document.getElementById("time").innerText = formatTime(time);
+  history.push(velocity);
+  if(history.length>100) history.shift();
+  drawGraph();
+
+  document.getElementById("speed").innerText=Math.round(velocity).toLocaleString()+" km/h";
+  document.getElementById("distance").innerText=Math.round(distance).toLocaleString()+" km";
+  document.getElementById("time").innerText=formatTime(time);
 
   let phase="Launch";
-  if(t>0.2) phase="Earth Orbit";
-  if(t>0.4) phase="Trans-Lunar Injection";
-  if(t>0.7) phase="Approach";
+  if(t>0.2) phase="LEO";
+  if(t>0.4) phase="TLI Burn";
+  if(t>0.7) phase="Midcourse";
   if(t>0.9) phase="Flyby";
 
   document.getElementById("phase").innerText=phase;
