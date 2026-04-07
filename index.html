@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Artemis II Mission Control</title>
+<title>Artemis Trajectory Display</title>
 
 <style>
 body {
@@ -15,74 +15,73 @@ body {
 
 .container {
   display: grid;
-  grid-template-columns: 3fr 1fr;
+  grid-template-columns: 4fr 1fr;
   height: 100vh;
 }
 
-/* SPACE */
+/* SPACE AREA */
 .space {
   position: relative;
+}
+
+/* Stars */
+.star {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
 }
 
 /* Earth */
 .earth {
   position: absolute;
-  width: 120px;
-  height: 120px;
+  width: 140px;
+  height: 140px;
   border-radius: 50%;
-  left: 10%;
-  top: 50%;
+  left: 8%;
+  top: 55%;
   transform: translateY(-50%);
   background: url("https://upload.wikimedia.org/wikipedia/commons/9/97/The_Earth_seen_from_Apollo_17.jpg");
   background-size: cover;
-  animation: rotateEarth 20s linear infinite;
-  box-shadow: 0 0 30px rgba(0,150,255,0.8);
-}
-
-@keyframes rotateEarth {
-  from { background-position: 0 0; }
-  to { background-position: 200% 0; }
+  box-shadow: 0 0 40px rgba(0,150,255,0.9);
 }
 
 /* Moon */
 .moon {
   position: absolute;
-  width: 60px;
-  height: 60px;
-  right: 10%;
-  top: 50%;
+  width: 70px;
+  height: 70px;
+  right: 8%;
+  top: 45%;
   transform: translateY(-50%);
   border-radius: 50%;
   background: #ccc;
-  box-shadow: 0 0 20px white;
+  box-shadow: 0 0 25px white;
+}
+
+/* Orbit path */
+svg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
 }
 
 /* Ship */
 .ship {
   position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   background: red;
   border-radius: 50%;
   box-shadow: 0 0 20px red;
 }
 
-/* Trail */
-.trail {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  background: rgba(255,0,0,0.3);
-  border-radius: 50%;
-}
-
-/* PANEL */
+/* Panel */
 .panel {
-  background: rgba(0,0,0,0.7);
+  background: rgba(0,0,0,0.8);
   padding: 20px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: space-around;
 }
 
 h1 {
@@ -97,12 +96,6 @@ h1 {
   color: #aaa;
   font-size: 0.8em;
 }
-
-/* Graph */
-canvas {
-  background: #111;
-  border-radius: 10px;
-}
 </style>
 </head>
 
@@ -111,11 +104,41 @@ canvas {
 <div class="container">
 
   <div class="space" id="space">
+
+    <!-- Stars -->
+    <script>
+      for(let i=0;i<200;i++){
+        let s=document.createElement("div");
+        s.className="star";
+        let size=Math.random()*2+1;
+        s.style.width=size+"px";
+        s.style.height=size+"px";
+        s.style.top=Math.random()*100+"%";
+        s.style.left=Math.random()*100+"%";
+        s.style.opacity=Math.random();
+        document.write(s.outerHTML);
+      }
+    </script>
+
+    <!-- Earth & Moon -->
     <div class="earth"></div>
     <div class="moon"></div>
+
+    <!-- Trajectory -->
+    <svg viewBox="0 0 1000 500">
+      <path id="orbit"
+        d="M 100 300 Q 500 50 900 250"
+        stroke="rgba(255,255,255,0.3)"
+        stroke-width="2"
+        fill="none"/>
+    </svg>
+
+    <!-- Spacecraft -->
     <div class="ship" id="ship"></div>
+
   </div>
 
+  <!-- PANEL -->
   <div class="panel">
     <h1>🚀 ARTEMIS II</h1>
 
@@ -123,94 +146,53 @@ canvas {
     <div class="data"><div class="label">Distance to Moon</div><div id="distance"></div></div>
     <div class="data"><div class="label">Mission Time</div><div id="time"></div></div>
     <div class="data"><div class="label">Phase</div><div id="phase"></div></div>
-
-    <canvas id="graph" width="300" height="150"></canvas>
   </div>
 
 </div>
 
 <script>
+const path = document.getElementById("orbit");
 const ship = document.getElementById("ship");
-const space = document.getElementById("space");
 
 let t = 0;
 let time = 0;
-let velocityHistory = [];
 
-// GRAPH
-const canvas = document.getElementById("graph");
-const ctx = canvas.getContext("2d");
-
-function drawGraph() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.beginPath();
-
-  velocityHistory.forEach((v,i) => {
-    let x = i * (canvas.width / 100);
-    let y = canvas.height - (v / 32000) * canvas.height;
-    if(i===0) ctx.moveTo(x,y);
-    else ctx.lineTo(x,y);
-  });
-
-  ctx.strokeStyle = "lime";
-  ctx.stroke();
-}
-
-// TIME FORMAT
 function formatTime(t){
-  let h = Math.floor(t/3600);
-  let m = Math.floor((t%3600)/60);
-  let s = t%60;
+  let h=Math.floor(t/3600);
+  let m=Math.floor((t%3600)/60);
+  let s=t%60;
   return `T+ ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-// MAIN LOOP
 function update(){
-  t += 0.002;
+  t += 0.0015;
   time++;
 
-  if(t > 1) t = 0;
+  if(t>1) t=0;
 
-  // Elliptical path
-  let x = 10 + 80 * t;
-  let y = 50 - 20 * Math.sin(Math.PI * t);
+  let point = path.getPointAtLength(t * path.getTotalLength());
 
-  ship.style.left = x + "%";
-  ship.style.top = y + "%";
+  ship.style.left = point.x + "px";
+  ship.style.top = point.y + "px";
 
-  // Trail
-  let trail = document.createElement("div");
-  trail.className = "trail";
-  trail.style.left = x + "%";
-  trail.style.top = y + "%";
-  space.appendChild(trail);
-
-  setTimeout(()=>trail.remove(), 2000);
-
-  // Physics-inspired velocity
-  let velocity = 28000 + 4000*Math.cos(Math.PI*t);
-
-  velocityHistory.push(velocity);
-  if(velocityHistory.length > 100) velocityHistory.shift();
-
-  drawGraph();
-
-  let distance = 384400 * (1 - t);
+  // telemetry
+  let velocity = 28000 + 5000*Math.cos(Math.PI*t);
+  let distance = 384400*(1-t);
 
   document.getElementById("speed").innerText = Math.round(velocity).toLocaleString()+" km/h";
   document.getElementById("distance").innerText = Math.round(distance).toLocaleString()+" km";
   document.getElementById("time").innerText = formatTime(time);
 
-  let phase = "Launch";
+  let phase="Launch";
   if(t>0.2) phase="Earth Orbit";
   if(t>0.4) phase="Trans-Lunar Injection";
   if(t>0.7) phase="Approach";
   if(t>0.9) phase="Flyby";
 
-  document.getElementById("phase").innerText = phase;
+  document.getElementById("phase").innerText=phase;
 }
 
-setInterval(update, 50);
+setInterval(update,50);
 </script>
 
 </body>
