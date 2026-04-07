@@ -19,7 +19,7 @@ body {
   height: 100vh;
 }
 
-/* SPACE AREA */
+/* SPACE */
 .space {
   position: relative;
 }
@@ -58,7 +58,7 @@ body {
   box-shadow: 0 0 25px white;
 }
 
-/* Orbit path */
+/* SVG */
 svg {
   position: absolute;
   width: 100%;
@@ -73,11 +73,12 @@ svg {
   background: red;
   border-radius: 50%;
   box-shadow: 0 0 20px red;
+  transform: translate(-50%, -50%);
 }
 
 /* Panel */
 .panel {
-  background: rgba(0,0,0,0.8);
+  background: rgba(0,0,0,0.85);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -103,40 +104,7 @@ h1 {
 
 <div class="container">
 
-  <div class="space" id="space">
-
-    <!-- Stars -->
-    <script>
-      for(let i=0;i<200;i++){
-        let s=document.createElement("div");
-        s.className="star";
-        let size=Math.random()*2+1;
-        s.style.width=size+"px";
-        s.style.height=size+"px";
-        s.style.top=Math.random()*100+"%";
-        s.style.left=Math.random()*100+"%";
-        s.style.opacity=Math.random();
-        document.write(s.outerHTML);
-      }
-    </script>
-
-    <!-- Earth & Moon -->
-    <div class="earth"></div>
-    <div class="moon"></div>
-
-    <!-- Trajectory -->
-    <svg viewBox="0 0 1000 500">
-      <path id="orbit"
-        d="M 100 300 Q 500 50 900 250"
-        stroke="rgba(255,255,255,0.3)"
-        stroke-width="2"
-        fill="none"/>
-    </svg>
-
-    <!-- Spacecraft -->
-    <div class="ship" id="ship"></div>
-
-  </div>
+  <div class="space" id="space"></div>
 
   <!-- PANEL -->
   <div class="panel">
@@ -151,8 +119,61 @@ h1 {
 </div>
 
 <script>
+const space = document.getElementById("space");
+
+/* ⭐ STAR FIELD */
+for(let i=0;i<200;i++){
+  let s=document.createElement("div");
+  s.className="star";
+  let size=Math.random()*2+1;
+  s.style.width=size+"px";
+  s.style.height=size+"px";
+  s.style.top=Math.random()*100+"%";
+  s.style.left=Math.random()*100+"%";
+  s.style.opacity=Math.random();
+  space.appendChild(s);
+}
+
+/* 🌍 Earth */
+let earth=document.createElement("div");
+earth.className="earth";
+space.appendChild(earth);
+
+/* 🌙 Moon */
+let moon=document.createElement("div");
+moon.className="moon";
+space.appendChild(moon);
+
+/* 🛰️ SVG PATH */
+space.innerHTML += `
+<svg viewBox="0 0 1000 500">
+
+  <!-- Full path -->
+  <path id="orbit"
+    d="M 100 300 Q 500 50 900 250"
+    stroke="rgba(255,255,255,0.2)"
+    stroke-width="2"
+    fill="none"/>
+
+  <!-- Traveled path -->
+  <path id="progress"
+    d="M 100 300 Q 500 50 900 250"
+    stroke="rgba(255,60,60,0.95)"
+    stroke-width="3"
+    fill="none"
+    stroke-linecap="round"
+    style="filter: drop-shadow(0 0 6px red);"
+    stroke-dasharray="0 1000"/>
+</svg>
+`;
+
+/* 🚀 Ship */
+let ship=document.createElement("div");
+ship.className="ship";
+space.appendChild(ship);
+
 const path = document.getElementById("orbit");
-const ship = document.getElementById("ship");
+const progressPath = document.getElementById("progress");
 
 let t = 0;
 let time = 0;
@@ -170,17 +191,27 @@ function update(){
 
   if(t>1) t=0;
 
-  let point = path.getPointAtLength(t * path.getTotalLength());
+  let totalLength = path.getTotalLength();
+  let currentLength = t * totalLength;
 
+  /* 🚀 Ship position */
+  let point = path.getPointAtLength(currentLength);
   ship.style.left = point.x + "px";
   ship.style.top = point.y + "px";
 
-  // telemetry
+  /* 🔴 Traveled path */
+  progressPath.style.strokeDasharray = currentLength + " " + totalLength;
+
+  /* 📊 Telemetry */
   let velocity = 28000 + 5000*Math.cos(Math.PI*t);
   let distance = 384400*(1-t);
 
-  document.getElementById("speed").innerText = Math.round(velocity).toLocaleString()+" km/h";
-  document.getElementById("distance").innerText = Math.round(distance).toLocaleString()+" km";
+  document.getElementById("speed").innerText =
+    Math.round(velocity).toLocaleString()+" km/h";
+
+  document.getElementById("distance").innerText =
+    Math.round(distance).toLocaleString()+" km";
+
   document.getElementById("time").innerText = formatTime(time);
 
   let phase="Launch";
