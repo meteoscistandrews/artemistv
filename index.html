@@ -1,4 +1,249 @@
-<iframe 
-  src="https://artemislivetracker.com/" 
-  style="width:100%; height:100vh; border:none;">
-</iframe>
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Artemis Tracker</title>
+
+<style>
+body {
+  margin: 0;
+  background: #000;
+  color: #e6edf3;
+  font-family: "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+}
+
+/* Layout */
+.container {
+  display: grid;
+  grid-template-columns: 5fr 1fr;
+  height: 100vh;
+}
+
+/* Space */
+.space {
+  position: relative;
+  background: radial-gradient(circle at 30% 40%, #02040a, #000);
+}
+
+/* Stars (subtle) */
+.star {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  opacity: 0.6;
+}
+
+/* Earth */
+.earth {
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  left: 10%;
+  top: 55%;
+  transform: translateY(-50%);
+  background: url("https://upload.wikimedia.org/wikipedia/commons/9/97/The_Earth_seen_from_Apollo_17.jpg");
+  background-size: cover;
+  box-shadow: 0 0 25px rgba(0,120,255,0.6);
+}
+
+/* Moon */
+.moon {
+  position: absolute;
+  width: 55px;
+  height: 55px;
+  right: 10%;
+  top: 45%;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: #ddd;
+  box-shadow: 0 0 15px rgba(255,255,255,0.5);
+}
+
+/* SVG */
+svg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+/* Path (thin, subtle) */
+#orbit {
+  stroke: rgba(255,255,255,0.15);
+  stroke-width: 1.5;
+}
+
+/* Traveled path */
+#progress {
+  stroke: rgba(255,80,80,0.9);
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(255,80,80,0.7));
+}
+
+/* Ship (small dot like real tracker) */
+.ship {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #ff4d4d;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #ff4d4d;
+  transform: translate(-50%, -50%);
+}
+
+/* Panel (clean NASA style) */
+.panel {
+  background: rgba(5,10,20,0.9);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-size: 13px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+.data {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  color: #8b949e;
+  font-size: 11px;
+}
+
+.value {
+  font-size: 15px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <div class="space" id="space"></div>
+
+  <div class="panel">
+    <div class="title">ARTEMIS II</div>
+
+    <div class="data">
+      <div class="label">Velocity</div>
+      <div id="speed" class="value"></div>
+    </div>
+
+    <div class="data">
+      <div class="label">Distance to Moon</div>
+      <div id="distance" class="value"></div>
+    </div>
+
+    <div class="data">
+      <div class="label">Mission Time</div>
+      <div id="time" class="value"></div>
+    </div>
+
+    <div class="data">
+      <div class="label">Phase</div>
+      <div id="phase" class="value"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const space = document.getElementById("space");
+
+/* Stars (subtle density) */
+for(let i=0;i<120;i++){
+  let s=document.createElement("div");
+  s.className="star";
+  let size=Math.random()*1.5+0.5;
+  s.style.width=size+"px";
+  s.style.height=size+"px";
+  s.style.top=Math.random()*100+"%";
+  s.style.left=Math.random()*100+"%";
+  s.style.opacity=Math.random()*0.6;
+  space.appendChild(s);
+}
+
+/* Earth + Moon */
+space.innerHTML += `<div class="earth"></div><div class="moon"></div>`;
+
+/* Trajectory */
+space.innerHTML += `
+<svg viewBox="0 0 1000 500">
+  <path id="orbit"
+    d="M 120 300 Q 520 80 880 250"
+    fill="none"/>
+
+  <path id="progress"
+    d="M 120 300 Q 520 80 880 250"
+    stroke-dasharray="0 1000"/>
+</svg>
+`;
+
+/* Ship */
+let ship=document.createElement("div");
+ship.className="ship";
+space.appendChild(ship);
+
+const path=document.getElementById("orbit");
+const progress=document.getElementById("progress");
+
+let t=0;
+let time=0;
+
+function formatTime(t){
+  let h=Math.floor(t/3600);
+  let m=Math.floor((t%3600)/60);
+  let s=t%60;
+  return `T+ ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function update(){
+  t+=0.0009;  // slower, more realistic
+  time++;
+
+  if(t>1) t=0;
+
+  let total=path.getTotalLength();
+  let current=t*total;
+
+  let p=path.getPointAtLength(current);
+
+  ship.style.left=p.x+"px";
+  ship.style.top=p.y+"px";
+
+  progress.style.strokeDasharray=current+" "+total;
+
+  /* telemetry (smooth variation) */
+  let velocity=31000-4000*t + 800*Math.sin(5*t);
+  let distance=384400*(1-t);
+
+  document.getElementById("speed").innerText=Math.round(velocity).toLocaleString()+" km/h";
+  document.getElementById("distance").innerText=Math.round(distance).toLocaleString()+" km";
+  document.getElementById("time").innerText=formatTime(time);
+
+  let phase="Launch";
+  if(t>0.15) phase="Earth Orbit";
+  if(t>0.35) phase="Trans-Lunar Injection";
+  if(t>0.65) phase="Cruise";
+  if(t>0.9) phase="Lunar Flyby";
+
+  document.getElementById("phase").innerText=phase;
+}
+
+setInterval(update,40);
+</script>
+
+</body>
+</html>
